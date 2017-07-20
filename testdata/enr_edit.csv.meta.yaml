@@ -1,0 +1,11 @@
+columns:
+  name:
+    units: null
+  start:
+    units: s
+  stop:
+    units: s
+  tier:
+    units: null
+creator: praat
+datatype: 2002
