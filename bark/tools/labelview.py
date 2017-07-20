@@ -123,6 +123,8 @@ def plot_spectrogram(data,
     NW : multi-taper bandwidth parameter for custom multi-taper Fourier
          transform estimate increasing this value reduces side-band
          ripple, decreasing sharpens peaks
+    derivative: if True, plots the spectral derivative, SAP style
+
     '''
     nfft = int(ms_nfft / 1000. * sr)
     start_samp = int(start * sr) - nfft // 2
@@ -136,34 +138,7 @@ def plot_spectrogram(data,
     pixels = 1000
     samples_per_pixel = int((stop - start) * sr / pixels)
     noverlap = max(nfft - samples_per_pixel, 0)
-    # Changes start from here
-    # the original version
-
-    # f, t, Sxx = spectrogram(x,
-    #                    sr,
-    #                    nperseg=nfft,
-    #                    noverlap=noverlap,
-    #                    mode='magnitude',
-    #                    window=window, )
-    # freq_mask = (f > lowfreq) & (f < highfreq)
-    # fsub = f[freq_mask]
-    # Sxxsub = Sxx[freq_mask, :]
-    # vmax = np.percentile(Sxxsub, 98)
-    # t += start
-    # if ax is None:
-    #    ax = plt.gca()
-    # image = ax.pcolorfast(t,
-    #                      fsub,
-    #                      Sxxsub,
-    #                      cmap=plt.get_cmap('viridis'),
-    #                      vmax=vmax,
-    #                      **kwargs)
-    # plt.sca(ax)
-    # plt.ylim(lowfreq, highfreq)
-    # print(image)
-
-
-    # return image
+    
     from matplotlib import colors
 
     spa = resin.Spectra(sr, 
@@ -174,11 +149,15 @@ def plot_spectrogram(data,
                     NW=NW,
                     freq_range=(lowfreq, highfreq))
     spa.signal(x)
-    pxx, f, t, thresh = spa.spectrogram(ax=ax, derivative=derivative)   
+    pxx, f, t, thresh = spa.spectrogram(ax=ax, derivative=derivative)  
+
+    # calculate the parameter for the plot 
     freq_mask = (f > lowfreq) & (f < highfreq)
     fsub = f[freq_mask]
     Sxxsub = pxx[freq_mask, :]
     t += start
+    
+    # plot the spectrogram 
     if derivative:
         image = ax.pcolorfast(t,
                       fsub,
