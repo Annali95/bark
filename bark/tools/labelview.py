@@ -106,6 +106,7 @@ def plot_spectrogram(data,
                      highfreq=8000,
                      n_tapers=2,
                      NW=1.5,
+                     derivative=True,
                      window=('kaiser', 8),
                      **kwargs):
     '''
@@ -173,12 +174,12 @@ def plot_spectrogram(data,
                     NW=NW,
                     freq_range=(lowfreq, highfreq))
     spa.signal(x)
-    pxx, f, t, thresh ,imagetype = spa.spectrogram(ax = ax)   
+    pxx, f, t, thresh = spa.spectrogram(ax=ax, derivative=derivative)   
     freq_mask = (f > lowfreq) & (f < highfreq)
     fsub = f[freq_mask]
     Sxxsub = pxx[freq_mask, :]
     t += start
-    if imagetype == "SymLogNorm":
+    if derivative:
         image = ax.pcolorfast(t,
                       fsub,
                       Sxxsub,

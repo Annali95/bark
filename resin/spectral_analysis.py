@@ -275,7 +275,7 @@ class Spectra(BaseSpectra):
         derivative - if True, plots the spectral derivative, SAP style
         colormap   - colormap to use, good values: 'inferno', 'gray'
 
-        Returns an axis object
+        Returns max spectral derivative, freqs, times, thresh
         """
         from matplotlib import colors
         if ax is None:
@@ -284,12 +284,11 @@ class Spectra(BaseSpectra):
         if derivative:
             pxx, f, t = self.max_spec_derivative(freq_range=freq_range)
             thresh = value_from_dB(dB_thresh, np.max(pxx))
-            imagetype = "SymLogNorm"
         else:
             pxx, f, t = self.power(freq_range)
             thresh = value_from_dB(dB_thresh, np.max(pxx))
-            imagetype = "LogNorm" 
-        return pxx, f, t, thresh, imagetype
+        return pxx, f, t, thresh
+
 
 def sap_spectra(sampling_rate, freq_range=None):
     ''' Creates a SAP-like spectrogram object for a given sampling rate.
