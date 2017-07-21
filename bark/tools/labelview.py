@@ -10,8 +10,8 @@ from bark.io.eventops import (OpStack, write_stack, read_stack, Update, Merge,
                               Split, Delete, New)
 import warnings
 warnings.filterwarnings('ignore')  # suppress matplotlib warnings
-# import resin
-from bark.tools.spectral_analysis import Spectra, ISpectra, sap_spectra
+from bark.tools.spectral import BarkSpectra
+
 
 help_string = '''
 Pressing any number or letter (uppercase or lowercase) will mark a segment.
@@ -134,8 +134,8 @@ def plot_spectrogram(data,
     noverlap = max(nfft - samples_per_pixel, 0)
     
     from matplotlib import colors
-
-    spa = Spectra(sr, 
+    
+    spa = BarkSpectra(sr, 
                     NFFT=nfft, 
                     noverlap=noverlap, 
                     data_window=int(0.01 * sr), 
