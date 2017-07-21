@@ -8,15 +8,8 @@ import matplotlib.pyplot as plt
 import bark
 from bark.io.eventops import (OpStack, write_stack, read_stack, Update, Merge,
                               Split, Delete, New)
-
-import seaborn
-seaborn.set_style('white')
-
-
 import warnings
 warnings.filterwarnings('ignore')  # suppress matplotlib warnings
-
-sys.path.append("/Current Folder/resin")
 import resin
 
 help_string = '''
