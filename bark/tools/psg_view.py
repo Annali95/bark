@@ -31,21 +31,17 @@ Shortcuts
 any letter or number    annotate segment
 ctrl+s                  saves the annotation data
 ctrl+h                  prints this message
-ctrl+o or up arrow      zoom out
-ctrl+i or down arrow    zoom in
-space, right, page down    next segment
-backspace, left, page up   previous segment
-ctrl+m, ctrl+backspace     merge current syllable with previous
-ctrl+x or tab           delete segment
+ctrl+o                  zoom out
+ctrl+i                  zoom in
+ctrl+j,right            next segment
+ctrl+i,left             previous segment
+
 ctrl+z                  undo last operation
 ctrl+y                  redo
 ctrl+w                  close
 
-click on segment boundary       move boundary
-ctrl+click inside a segment     split segment
-ctrl+click outside a segment    new segment (TODO)
-
-click on segment boundaries to adjust them.
+click on the right of the current label        next segment
+click on the left of the current label        previous segment
 
 The bottom panel is a map of all label locations.
 Click on a label to travel to that location.
@@ -53,11 +49,8 @@ Click on a label to travel to that location.
 On close, an operation file and the final event file will be written.
 Do not kill from terminal unless you want to prevent a save.
 
-To create custom label, create an external YAML file with key: value pairs
-like this:
-    1: c1
-    2: c2
-    z: a*
+To create custom label, input the label name in the right toolbar.
+
 
 ''' 
 
@@ -188,54 +181,61 @@ def createlabel(name,start,end,interval):
     df = pd.DataFrame(data) 
     df.to_csv(name,index=False) 
 
-
-def main(outfile=None, shortcutfile=None, use_ops=True):
-
-    showDia = Input()
-    gap = int(showDia.showDialog())
-
-
-    file = FileDialog()
+def getfiles():
+    file = FileDialog()   
     files = file.openFileNamesDialog() 
-
-    dat = files[0]
-    labelfile = file.openFileNameDialog()
-    
-    # create metadata file if not exist
-    # load labelfile if exist
-    if not labelfile:
+    if not files:
+        sys.exit(app.exec_())
+    sampled = [bark.read_sampled(file) for file in files]   
+    readonlylabelfile = file.openFileNameDialog()
+    if not readonlylabelfile:
         import pandas as pd
         origin_labels = pd.DataFrame()    
-        labelfile = os.path.splitext(dat)[0] + '_split.csv'
-        write_metadata(labelfile)
-
     else:
-        origin_labels = bark.read_events(labelfile).data
-        labelfile = os.path.splitext(dat)[0] + '_split.csv'
+        origin_labels = bark.read_events(readonlylabelfile).data   
+    return files, sampled, sampled
 
+
+
+def readfiles(outfile=None, shortcutfile=None, use_ops=True):
+    gap = 0
+    file = FileDialog()   
+    files = file.openFileNamesDialog() 
+    if not files:
+        sys.exit(app.exec_())
+    sampled = [bark.read_sampled(file) for file in files]   
+    readonlylabelfile = file.openFileNameDialog()
+    if not readonlylabelfile:
+        import pandas as pd
+        origin_labels = pd.DataFrame()    
+    else:
+        origin_labels = bark.read_events(readonlylabelfile).data   
+    trace_num = len(files)
+    dat = files[0]
+    labelfile = os.path.splitext(dat)[0] + '_split.csv' 
+    exist = os.path.exists(labelfile)
     kill_shortcuts(plt)
-    
-    sampled = [bark.read_sampled(file) for file in files]
-     
-    start = 0
-    end = int(round(len(sampled[0].data)/sampled[0].attrs["sampling_rate"]))
-    trace_num = len(sampled)
-    
-    #create a new label file in a constant interval named with _split
-    createlabel(labelfile,start,end,gap)  
-    
-    #read labels from the new labelfile and load data into opstack
-    #we will use the old opstack if exist
+    opsfile = labelfile + '.ops.json'  
+    if not os.path.exists(labelfile):
+        showDia = Input()
+        gap = int(showDia.showDialog())
+        start = 0
+        end = int(round(len(sampled[0].data)/sampled[0].attrs["sampling_rate"]))
+        trace_num = len(sampled)
+        createlabel(labelfile,start,end,gap)    
     labels = bark.read_events(labelfile)
     labeldata = to_seconds(labels).data.to_dict('records')
-
     if len(labeldata) == 0:
         print('{} contains no intervals.'.format(labelfile))
         return
-    shortcuts = build_shortcut_map(shortcutfile)
-    opsfile = labelfile + '.ops.json'
     opstack = load_opstack(opsfile, labelfile, labeldata, use_ops)
+    if not gap:
+        if len(opstack.events) == 0:
+            print('opstack is empty. Please delete {}.'.format(opstack))
+            return
+        gap = opstack.events[0]['stop'] - opstack.events[0]['start']
 
+    shortcuts = build_shortcut_map(shortcutfile)
     #create a new outfile  
     if not outfile:
         outfile = os.path.splitext(labelfile)[0] + '_edit.csv'
@@ -433,12 +433,9 @@ class PlotCanvas(FigureCanvas):
         self.axes_1 = fig.add_subplot(height+1,1,3)
         self.axes_2 = fig.add_subplot(height+1,1,4)
         self.axes_3 = fig.add_subplot(height+1,1,5)        
-        pos = self.axes_3.get_position()
-        
-        pos_psg = [pos.x0, 0.05 ,pos.width, pos.y0 - 0.1]
-        
+        pos = self.axes_3.get_position()        
+        pos_psg = [pos.x0, 0.05 ,pos.width, pos.y0 - 0.1]        
         self.axes_4 = fig.add_axes(pos_psg)
-
 
         self.origin_data = origin_data
         self.trace_num = trace_num
@@ -446,11 +443,9 @@ class PlotCanvas(FigureCanvas):
         self.sr = 0
         self.gap = gap
         self.yrange = 4000
-
         for dataset in sampled:
             self.data.append(dataset.data.ravel())
             self.sr = dataset.sampling_rate
-
         self.maxpoint = 15        
         self.N_points = int(round(self.sr*self.gap*self.maxpoint)) 
         self.label_attrs = out_attrs
@@ -458,7 +453,7 @@ class PlotCanvas(FigureCanvas):
         self.opsfile = opsfile
         self.outfile = outfile
         self.keymap = keymap
-        
+     
         if opstack.ops:
             self.label_index = opstack.ops[-1].index
         else:
@@ -472,7 +467,6 @@ class PlotCanvas(FigureCanvas):
         self.current_ax = Plot(ax=self.axes_3,x_visible=False, y_visible=False,gap=gap)
         self.map_ax = self.axes
         self.initialize_minimap()
-
 
         FigureCanvas.__init__(self, fig)
         self.setParent(parent)
@@ -495,14 +489,11 @@ class PlotCanvas(FigureCanvas):
         
         i = self.label_index       
         sr = self.sr
-
         start = self.opstack.events[i]['start']
         start_samp = int(start * sr)
         stop = self.opstack.events[i]['stop']
         stop_samp = int(stop * sr)
-
-        syl_samps = stop_samp - start_samp
-        
+        syl_samps = stop_samp - start_samp     
         buffer_start_samp = start_samp - (self.N_points - syl_samps) // 2
         
         if buffer_start_samp < 0:
@@ -517,12 +508,10 @@ class PlotCanvas(FigureCanvas):
         buf_stop = buffer_stop_samp / sr
 
         name = self.opstack.events[i]['name']
-
         #fix me ax line covered by the grey line
         self.psg_ax.yrange = self.yrange
         self.psg_ax.update_psgillograms(buffer_start_samp,buffer_stop_samp)
         self.psg_ax.update_boundary(start,stop)
-
 
         if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
             if not self.origin_data.empty:           
@@ -643,7 +632,11 @@ class PlotCanvas(FigureCanvas):
                 return
         self.opstack.push(Update(self.label_index, 'name', str))
         self.inc_i()
-
+    
+    def deletelabel(self):
+        if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
+                return
+        self.opstack.push(Update(self.label_index, '', str))
 
     def zoom_in_x(self):
         self.N_points += int(self.sr * self.gap)*20
@@ -667,7 +660,6 @@ class PlotCanvas(FigureCanvas):
         if self.label_index >= len(self.opstack.events):
             self.label_index = len(self.opstack.events) - 1
         self.update_plot_data()       
-
 
     def redo(self):
         if self.opstack.undo_ops:
@@ -723,12 +715,14 @@ class FileDialog(QWidget):
             return files
         else:
             self.close()
+
     def openFileNameDialog(self):    
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         fileName, _ = QFileDialog.getOpenFileName(self,"Choose a label file", "","csv Files (*.csv);;Python Files (*.py)", options=options)
         if fileName:
             return fileName
+
 
 class Input(QWidget):
     
@@ -790,6 +784,7 @@ class App(QMainWindow):
         self.control_menu.addAction('&zoom out y',self.reviewer.zoom_out_y, QtCore.Qt.CTRL + QtCore.Qt.Key_E)
         self.control_menu.addAction('&next',self.reviewer.inc_i, QtCore.Qt.CTRL + QtCore.Qt.Key_J)
         self.control_menu.addAction('&previous',self.reviewer.dec_i,QtCore.Qt.CTRL + QtCore.Qt.Key_F)
+        self.control_menu.addAction('&delete',self.reviewer.deletelabel,QtCore.Qt.Key_Backspace)
 
 
 
@@ -797,10 +792,11 @@ class App(QMainWindow):
 
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
-        origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile = main()    
+        origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile = readfiles()    
         height = trace_num*2 + 4
         
-        self.reviewer = PlotCanvas(origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=8, height=height)
+        self.reviewer = PlotCanvas(origin_labels,trace_num, gap, sampled, 
+            opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=8, height=height)
         self.reviewer.connect()
         self.reviewer.move(20,20)
 
@@ -820,17 +816,7 @@ class App(QMainWindow):
         self.label_2 = QLineEdit(self)
         label_2_button = QPushButton("Ok",self)
         label_2_button.setToolTip('Change the number of label to display')
-
-
-        # lbl_3 = QLabel(self)
-        # lbl_3.setText("Max number of Label to display")
-        # self.label_3 = QLineEdit(self)
-        # label_3_button = QPushButton("Ok",self)
-        # label_3_button.setToolTip('Change the number of label to display')
-
         start_x = 820
-        
-
         lbl.move(start_x, 30)
         self.label.move(start_x, 60)
         label_button.move(start_x,90)
@@ -840,11 +826,6 @@ class App(QMainWindow):
         self.label_2.move(start_x, 150)
         label_2_button.move(start_x,180)
         label_2_button.clicked.connect(self.change_label)
-
-        # lbl_3.move(start_x, 210)
-        # self.label_3.move(start_x, 240)
-        # label_3_button.move(start_x,280)
-        # label_3_button.clicked.connect(self.change_label_max)
 
         for i in range(0,trace_num):
             box = QCheckBox('Track'+ str(i+1), self)
