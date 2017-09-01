@@ -97,26 +97,15 @@ def nearest_label(labels, xdata):
 
 def write_metadata(path, meta='.meta.yaml'):
     import codecs
-    dict = {}
-    unit = {}
-    unit['units'] = 'null'
-    dict['name'] = unit
-    unit1 = {}
-    unit1['units'] = 's'
-    dict['start'] = unit1
-    unit2 = {}
-    unit2['units'] = 's'
-    dict['stop'] = unit2
-    params = {}
-    params['columns'] = dict
-
-    params['datatype'] = 2002
-
+    params = {'columns': {'name': {'units': 'null'},
+                          'start': {'units': 's'},
+                          'stop': {'units': 's'}},
+                          'datatype': 2002}
+    # bark.write_metadata(path, meta, params)
     if os.path.isdir(path):
         metafile = os.path.join(path, meta[1:])
     else:
         metafile = path + meta
-
     with codecs.open(metafile, 'w', encoding='utf-8') as yaml_file:
         yaml_file.write(yaml.safe_dump(params, default_flow_style=False))
 
@@ -216,6 +205,10 @@ def readfiles(outfile=None, shortcutfile=None, use_ops=True):
     exist = os.path.exists(labelfile)
     kill_shortcuts(plt)
     opsfile = labelfile + '.ops.json'  
+    metadata = labelfile + '.meta.yaml'
+    if not os.path.exists(labelfile):
+        write_metadata(labelfile)
+
     if not os.path.exists(labelfile):
         showDia = Input()
         gap = int(showDia.showDialog())
@@ -223,6 +216,8 @@ def readfiles(outfile=None, shortcutfile=None, use_ops=True):
         end = int(round(len(sampled[0].data)/sampled[0].attrs["sampling_rate"]))
         trace_num = len(sampled)
         createlabel(labelfile,start,end,gap)    
+
+
     labels = bark.read_events(labelfile)
     labeldata = to_seconds(labels).data.to_dict('records')
     if len(labeldata) == 0:
@@ -889,10 +884,13 @@ class App(QMainWindow):
 
         self.reviewer.update_plot_data()
 
-if __name__ == '__main__':
+
+def _main():
     app = QApplication(sys.argv)
     ex = App()
     sys.exit(app.exec_())
 
+if __name__ == '__main__':
+    _main()
 
 
