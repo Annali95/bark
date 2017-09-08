@@ -43,7 +43,7 @@ ctrl+w                  close
 click on the right of the current label        next segment
 click on the left of the current label        previous segment
 
-The bottom panel is a map of all label locations.
+The top panel is a map of all label locations.
 Click on a label to travel to that location.
 
 On close, an operation file and the final event file will be written.
@@ -101,16 +101,8 @@ def write_metadata(path, meta='.meta.yaml'):
                           'start': {'units': 's'},
                           'stop': {'units': 's'}},
                           'datatype': 2002}
-    # bark.write_metadata(path, meta, params)
-    if os.path.isdir(path):
-        metafile = os.path.join(path, meta[1:])
-    else:
-        metafile = path + meta
-    with codecs.open(metafile, 'w', encoding='utf-8') as yaml_file:
-        yaml_file.write(yaml.safe_dump(params, default_flow_style=False))
+    bark.write_metadata(path, meta, **params)
 
-    print("written metafile")
-    print(metafile)
 
 def build_shortcut_map(mapfile=None):
     allkeys = string.digits + string.ascii_letters
@@ -272,6 +264,7 @@ class Psg_Plot(Plot):
        
 
         Plot.__init__(self,ax,x_visible,y_visible,gap)
+        self.init = False
         self.data = data
         self.sr = sr
         self.yrange = yrange
@@ -296,7 +289,12 @@ class Psg_Plot(Plot):
         self.boundary_start.set_xdata((start, start))
         self.boundary_stop.set_xdata((stop, stop))
 
+    def get_yrange(self,buffer_start_samp,buffer_stop_samp):
+        x = self.data[0][buffer_start_samp:buffer_stop_samp]   
+        return max(x) - min(x)
+
     def update_psgillograms(self,buffer_start_samp,buffer_stop_samp):
+
         offset = self.yrange/2
         buf_start = buffer_start_samp / self.sr
         buf_stop = buffer_stop_samp / self.sr
@@ -307,7 +305,7 @@ class Psg_Plot(Plot):
             else:
                 self.psg_line[i].set_visible(False)
             
-            x = self.data[i][buffer_start_samp:buffer_stop_samp]         
+            x = self.data[i][buffer_start_samp:buffer_stop_samp]   
             t = np.arange(len(x)) / self.sr + buf_start
             if len(x) > 10000:
                 t_interp = np.linspace(buf_start, buf_stop, 10000)
@@ -319,11 +317,11 @@ class Psg_Plot(Plot):
             self.psg_line[i].set_data(t_interp, x_interp)
             offset += self.yrange
 
-
         self.update_x_axis(buf_start, buf_stop)    
         self.ax.yaxis.set_ticks(np.arange(0, offset, self.yrange/4))
         self.ax.set_ylim(0,offset)
         self.set_y()
+        self.init = True
     
     def set_y(self):
         labels = [item.get_text() for item in self.ax.get_yticklabels()]
@@ -418,7 +416,20 @@ class Label_Plot(Plot):
 
 class PlotCanvas(FigureCanvas):
  
-    def __init__(self, origin_data, trace_num, gap, sampled, opstack, keymap, outfile, out_attrs, opsfile=None, parent=None, width=5, height=10, dpi=100):
+    def __init__(self, 
+                 origin_data, 
+                 trace_num, 
+                 gap, 
+                 sampled, 
+                 opstack, 
+                 keymap, 
+                 outfile, 
+                 out_attrs, 
+                 opsfile=None, 
+                 parent=None, 
+                 width=5, 
+                 height=10, 
+                 dpi=100):
         
         fig = Figure(figsize=(width, height), dpi=dpi)
         
@@ -448,13 +459,21 @@ class PlotCanvas(FigureCanvas):
         self.opsfile = opsfile
         self.outfile = outfile
         self.keymap = keymap
+        self.y_init = False
+
      
         if opstack.ops:
             self.label_index = opstack.ops[-1].index
         else:
             self.label_index = 0       
 
-        self.psg_ax = Psg_Plot(ax= self.axes_4,gap=gap,trace_num=trace_num,N_points = self.N_points, data=self.data,sr = self.sr)
+        self.psg_ax = Psg_Plot(ax= self.axes_4,
+                               gap=gap,
+                               trace_num=trace_num,
+                               N_points = self.N_points, 
+                               data=self.data,
+                               sr = self.sr
+                               )
         if not self.origin_data.empty:
             self.label_ax = Label_Plot(ax=self.axes_1,x_visible=False, y_visible=False,gap=gap)
         
@@ -479,9 +498,7 @@ class PlotCanvas(FigureCanvas):
             print('no segments')
             plt.close("all")
             return
-        
-        self.selected_boundary = None
-        
+                
         i = self.label_index       
         sr = self.sr
         start = self.opstack.events[i]['start']
@@ -504,6 +521,10 @@ class PlotCanvas(FigureCanvas):
 
         name = self.opstack.events[i]['name']
         #fix me ax line covered by the grey line
+        # if self.y_init == False:
+        #     self.yrange = self.psg_ax.get_yrange(buffer_start_samp,buffer_stop_samp)
+        #     self.y_init = True
+
         self.psg_ax.yrange = self.yrange
         self.psg_ax.update_psgillograms(buffer_start_samp,buffer_stop_samp)
         self.psg_ax.update_boundary(start,stop)
