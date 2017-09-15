@@ -1,5 +1,7 @@
 from PyQt5.QtWidgets import QMenu, QVBoxLayout, QSizePolicy, QMessageBox, QWidget, QPushButton
 from PyQt5.QtGui import QIcon
+from PyQt5 import QtGui
+
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QInputDialog, QLineEdit, QFileDialog
@@ -370,7 +372,6 @@ class Psg_Plot(Plot):
             temp = int(xtickslocs[i])% 3600
             minute = temp/60
             sec = temp%60
-
             labels[i] =  "%.d : %.d : %.d" %(hour,minute,sec) 
 
         self.ax.set_xticklabels(labels)    
@@ -841,6 +842,13 @@ class Input(QWidget):
         if ok:
             return gap 
 
+class ScrollView (QtWidgets.QScrollArea):
+    def __init__(self, parent = None):
+        super(ScrollView, self).__init__(parent)
+
+    def keyPressEvent (self, e):
+        super(ScrollView, self).keyPressEvent(e)
+        e.ignore()
 
 class App(QMainWindow):
  
@@ -906,7 +914,7 @@ class App(QMainWindow):
         self.reviewer.connect()
         self.reviewer.move(20,0)
 
-        self.scroll = QScrollArea(self.widget)
+        self.scroll = ScrollView(self.widget)
         self.scroll.setWidget(self.reviewer)
         self.widget.layout().addWidget(self.scroll)
         self.checkboxes = []
@@ -960,7 +968,8 @@ class App(QMainWindow):
 
             self.scale_button_in.append(button_1)
             self.scale_button_out.append(button_2)
-
+    def keyPressEvent(self,e):
+        self.reviewer.on_key_press(e)
 
     def add_label(self):
         text = self.label.text()
@@ -1014,10 +1023,6 @@ class App(QMainWindow):
                                 )
     def help(self):
         QtWidgets.QMessageBox.about(self, "Help", help_string)
-    
-    def keyPressEvent(self,e):
-        self.reviewer.on_key_press(e)
-
 
     def state_changed(self, state):
         target = self.sender()
