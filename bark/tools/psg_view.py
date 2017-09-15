@@ -55,8 +55,14 @@ To create custom label, input the label name in the right toolbar.
 ''' 
 
 
-color = 'green'
+color = 'yellow'
+color_label = 'white'
 fontsize = 12
+default_gap = 3
+psg_scale = 2.5 #change the scale of the psg_viewer
+
+number_shortcut = {'1':'I', '2':'S','3':'C', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9', '0':'0'}
+
 # kill all the shorcuts
 def kill_shortcuts(plt):
     plt.rcParams['keymap.all_axes'] = ''
@@ -151,6 +157,16 @@ def load_opstack(opsfile, labelfile, labeldata, use_ops):
 
 
 def createlabel(name,start,end,interval):
+    """.
+    create a new empty label file with customize gap
+
+    name: the name of label file
+    start: the start time 
+    endL the end time
+    interval: the gap between label
+
+    Returns: None
+    """
     import pandas as pd
     data = []
     while start+interval < end:
@@ -179,6 +195,15 @@ def getfiles():
 
 
 def readfiles(outfile=None, shortcutfile=None, use_ops=True):
+    """Read all files from the fileDialog and create files if those files are missing.
+
+    If no .dat files, exit.
+    Auto find label file named with '[dat_name]_split.csv' 
+    If not exist, create a new one with customize label and a .meta file 
+    create opstack and outfiles
+
+    Returns: origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, labels.attrs, opsfile
+    """
     gap = 0
     file = FileDialog()   
     files = file.openFileNamesDialog() 
@@ -226,12 +251,18 @@ def readfiles(outfile=None, shortcutfile=None, use_ops=True):
     #create a new outfile  
     if not outfile:
         outfile = os.path.splitext(labelfile)[0] + '_edit.csv'
+    channelname = []
+    import re   
+    for name in files:
+        searchObj = re.search( r'(.*)/(.*).dat', name, re.M|re.I)
+        channelname.append(searchObj.group(2))
 
-    return origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, labels.attrs, opsfile
+
+    return origin_labels,trace_num, channelname, gap, sampled, opstack, shortcuts, outfile, labels.attrs, opsfile
 
 
 class Plot:
-    def __init__(self,ax, x_visible=True, y_visible=True, gap=3):
+    def __init__(self,ax, x_visible=True, y_visible=True, gap=default_gap):
         self.ax = ax
         self.ax.set_axis_bgcolor('k')
         self.boundary_start = self.ax.axvline(color=color)
@@ -239,7 +270,7 @@ class Plot:
         self.gap = gap
         self.label = self.ax.text(0,0,'',fontsize=fontsize,color=color)
         self.label.set_visible(False)
-        self.ax.figure.tight_layout()
+        # self.ax.figure.tight_layout()
         self.ax.get_xaxis().set_visible(x_visible)
         self.ax.get_yaxis().set_visible(y_visible)
 
@@ -250,6 +281,7 @@ class Plot:
         self.ax.cla()
    
     def update_one_label(self,start,stop,name):
+        # self.boundary_start.setcolor
         self.boundary_start.set_xdata((start, start))
         self.boundary_stop.set_xdata((stop, stop))
         ymin, ymax = self.ax.get_ylim()
@@ -260,7 +292,8 @@ class Plot:
         self.label.set_visible(True)
 
 class Psg_Plot(Plot):
-    def __init__(self,ax,trace_num,data,sr, N_points, x_visible=True, y_visible=True, yrange=0.5, gap=3):
+
+    def __init__(self,ax,trace_num,data,sr,channelname, N_points, x_visible=True, y_visible=True, yrange=0.5, gap=default_gap):
        
 
         Plot.__init__(self,ax,x_visible,y_visible,gap)
@@ -272,6 +305,8 @@ class Psg_Plot(Plot):
         self.psg_line = []
         self.trace_num = trace_num
         self.display = []
+        self.channelname = channelname
+        self.scale = []
 
         for i in range(self.trace_num):
             line, = self.ax.plot(
@@ -280,6 +315,7 @@ class Psg_Plot(Plot):
                 color='gray')
             self.psg_line.append(line)
             self.display.append(True)
+            self.scale.append(1)
 
 
     def update_y_axis(self,yrange):
@@ -313,38 +349,66 @@ class Psg_Plot(Plot):
             else:
                 t_interp = t
                 x_interp = x
-            x_interp = list(map(lambda num: num+offset, x_interp))
+            x_interp = list(map(lambda num: int(num*self.scale[i])+offset, x_interp))
+
             self.psg_line[i].set_data(t_interp, x_interp)
             offset += self.yrange
 
-        self.update_x_axis(buf_start, buf_stop)    
+        self.update_x_axis(buf_start, buf_stop)   
         self.ax.yaxis.set_ticks(np.arange(0, offset, self.yrange/4))
         self.ax.set_ylim(0,offset)
         self.set_y()
+        self.set_x()
+
         self.init = True
-    
+    def set_x(self):
+        labels = [item.get_text() for item in self.ax.get_xticklabels()]
+        xtickslocs = self.ax.get_xticks()
+        
+        for i in range(len(labels)-1):
+            hour = int(xtickslocs[i])/3600
+            temp = int(xtickslocs[i])% 3600
+            minute = temp/60
+            sec = temp%60
+
+            labels[i] =  "%.d : %.d : %.d" %(hour,minute,sec) 
+
+        self.ax.set_xticklabels(labels)    
     def set_y(self):
         labels = [item.get_text() for item in self.ax.get_yticklabels()]
         
         for i in range(len(labels)-1):
             if i%4 == 1:
-                labels[i] = -self.yrange/4
+                a = -self.yrange/(4*self.scale[int(i/4)])
+                labels[i] = "%.2f" % a
             elif i%4 == 2:
-                labels[i] = "track %d"%((len(labels) - i)/4)
+                labels[i] = self.channelname[int(i/4)]
             elif i%4 == 3:
-                labels[i] = self.yrange/4
+                a = self.yrange/(4*self.scale[int(i/4)])
+                labels[i] = "%.2f" % a
+
             else :
                 labels[i] = ""
 
         self.ax.set_yticklabels(labels)
+'''
+class Label_Plot
 
+parameter:
+
+ax : axis object to plot spectrogram on
+x_visible : if x axis visible
+y_visible: if y axis visible
+gap: the gap between two label
+
+'''
 
 class Label_Plot(Plot):
-    def __init__(self,ax, x_visible=True, y_visible=True,gap=3):
+    def __init__(self,ax, x_visible=True, y_visible=True,gap=default_gap):
         Plot.__init__(self,ax,x_visible,y_visible,gap)
-        self.labels = [self.ax.text(0,0,'',fontsize=fontsize,color=color) for _ in range(20)]
-        self.boundaries_start =  [self.ax.axvline(color=color) for _ in range(20)]
-        self.boundaries_stop =  [self.ax.axvline(color=color) for _ in range(20)]
+        self.labels = [self.ax.text(0,0,'',fontsize=fontsize,color=color_label) for _ in range(20)]
+        self.boundaries_start =  [self.ax.axvline(color=color_label) for _ in range(20)]
+        self.boundaries_stop =  [self.ax.axvline(color=color_label) for _ in range(20)]
     def update_y_axis(self,yrange):
         self.yrange = yrange
 
@@ -357,8 +421,10 @@ class Label_Plot(Plot):
 
     def update_labels(self,current,data,origin_data=False): 
         if origin_data == False:
+            # update the current creating labels
             self.update_opstack_labels(current,data)
         else:
+            # update the origin loaded labels
             self.update_origin_labels(current,data)
 
     def update_opstack_labels(self,current,opstack,y_pos = 4):
@@ -393,11 +459,22 @@ class Label_Plot(Plot):
                 start_line.set_xdata((start, start))
                 stop_line.set_xdata((stop, stop))
 
+                if i == current:
+                    # The start line overlap with the stop line of previous label.
+                    # Fix this by putting start line and stop line on the top layer.
+                    # start_line.set_color('r')
+
+                    start_line_1 = self.boundaries_stop[label_i-1]
+                    start_line_1.set_color(color)
+                    stop_line.set_color(color)
+                    text.set_color(color)
+
 
             else:
                 self.labels[label_i].set_visible(False)
 
     def update_origin_labels(self,current,origin_data):
+        self.ax.cla()
         xmin, xmax = self.ax.get_xlim()
         for i in range(0,len(origin_data)):
             if(origin_data["start"][i]>=xmin):
@@ -420,7 +497,8 @@ class PlotCanvas(FigureCanvas):
                  origin_data, 
                  trace_num, 
                  gap, 
-                 sampled, 
+                 sampled,
+                 channelname, 
                  opstack, 
                  keymap, 
                  outfile, 
@@ -431,17 +509,16 @@ class PlotCanvas(FigureCanvas):
                  height=10, 
                  dpi=100):
         
-        fig = Figure(figsize=(width, height), dpi=dpi)
+        fig = Figure(figsize =(width,height),dpi=dpi)
         
         self.maxpoint = 20
-
-        self.axes = fig.add_subplot(height+1,1,2)
-        self.axes_1 = fig.add_subplot(height+1,1,3)
-        self.axes_2 = fig.add_subplot(height+1,1,4)
-        self.axes_3 = fig.add_subplot(height+1,1,5)        
-        pos = self.axes_3.get_position()        
-        pos_psg = [pos.x0, 0.05 ,pos.width, pos.y0 - 0.1]        
-        self.axes_4 = fig.add_axes(pos_psg)
+        self.axes_1 = fig.add_subplot(height+1,1,1)
+        self.axes_2 = fig.add_subplot(height+1,1,2)
+        pos = self.axes_2.get_position()       
+        pos_psg = [pos.x0, 1/(height+1) + 0.1 ,pos.width, pos.height * (height-2.2)] 
+        pos_map = [pos.x0, 0.05 ,pos.width, pos.height] 
+        self.axes_4 = fig.add_axes(pos_psg) 
+        self.axes = fig.add_axes(pos_map) 
 
         self.origin_data = origin_data
         self.trace_num = trace_num
@@ -472,13 +549,14 @@ class PlotCanvas(FigureCanvas):
                                trace_num=trace_num,
                                N_points = self.N_points, 
                                data=self.data,
-                               sr = self.sr
+                               sr = self.sr,
+                               channelname = channelname
                                )
         if not self.origin_data.empty:
             self.label_ax = Label_Plot(ax=self.axes_1,x_visible=False, y_visible=False,gap=gap)
-        
+        else :
+            self.label_ax = Label_Plot(ax=self.axes_1,x_visible=False, y_visible=False,gap=gap)        
         self.label_ax_2 = Label_Plot(ax=self.axes_2,x_visible=False, y_visible=False,gap=gap)
-        self.current_ax = Plot(ax=self.axes_3,x_visible=False, y_visible=False,gap=gap)
         self.map_ax = self.axes
         self.initialize_minimap()
 
@@ -493,6 +571,7 @@ class PlotCanvas(FigureCanvas):
  
  
     def update_plot_data(self):
+
 
         if not self.opstack.events:
             print('no segments')
@@ -521,9 +600,6 @@ class PlotCanvas(FigureCanvas):
 
         name = self.opstack.events[i]['name']
         #fix me ax line covered by the grey line
-        # if self.y_init == False:
-        #     self.yrange = self.psg_ax.get_yrange(buffer_start_samp,buffer_stop_samp)
-        #     self.y_init = True
 
         self.psg_ax.yrange = self.yrange
         self.psg_ax.update_psgillograms(buffer_start_samp,buffer_stop_samp)
@@ -540,9 +616,9 @@ class PlotCanvas(FigureCanvas):
                 self.label_ax.update_labels(current = i,data = self.origin_data,origin_data=True) 
            
             self.label_ax_2.update_x_axis(buf_start,buf_stop)       
+            self.label_ax_2.update_one_label(start,stop,name)      
+
             self.label_ax_2.update_labels(current = i,data = self.opstack,origin_data=False)
-        self.current_ax.update_one_label(start,stop,name)
-        self.current_ax.update_x_axis(buf_start,buf_stop)     
 
         self.update_minimap()
         
@@ -582,6 +658,8 @@ class PlotCanvas(FigureCanvas):
                                 right='off',
                                 labelleft='off')
         self.map_ax.set_ylim(-1, 38)
+        self.map_ax.get_xaxis().set_visible(False)
+
 
     def update_minimap(self):
         # If perfomance lags, may need to adjust plot elements instead of
@@ -636,10 +714,20 @@ class PlotCanvas(FigureCanvas):
             self.inc_i()
         elif event.key() == Qt.Key_Left:
             self.dec_i()
+        if event.key()  == Qt.Key_Up:
+            self.zoom_in_x()
+        elif event.key() == Qt.Key_Down:
+            self.zoom_out_x()
         elif event.key() <= Qt.Key_Z and event.key() >= Qt.Key_A:
             if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
                 return
             newlabel = chr(event.key())
+            self.opstack.push(Update(self.label_index, 'name', newlabel))
+            self.inc_i()
+        elif event.key() <= Qt.Key_9 and event.key() >= Qt.Key_0:
+            if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
+                return
+            newlabel = number_shortcut[chr(event.key())]
             self.opstack.push(Update(self.label_index, 'name', newlabel))
             self.inc_i()
 
@@ -653,6 +741,8 @@ class PlotCanvas(FigureCanvas):
         if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
                 return
         self.opstack.push(Update(self.label_index, '', str))
+        self.update_plot_data()       
+
 
     def zoom_in_x(self):
         self.N_points += int(self.sr * self.gap)*20
@@ -726,7 +816,7 @@ class FileDialog(QWidget):
     def openFileNamesDialog(self):    
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        files, _ = QFileDialog.getOpenFileNames(self,"Choose all the sound files", "","dat Files (*.dat);;Python Files (*.py)", options=options)
+        files, _ = QFileDialog.getOpenFileNames(self,"Choose all the .dat files (One channel per file)", "","dat Files (*.dat);;Python Files (*.py)", options=options)
         if files:
             return files
         else:
@@ -747,7 +837,7 @@ class Input(QWidget):
       
     def showDialog(self):       
         gap, ok = QInputDialog.getText(self, 'Input Dialog', 
-            'Enter the gap of each label:')        
+            'Enter the length of each epoch for labeling (in seconds):')        
         if ok:
             return gap 
 
@@ -764,7 +854,7 @@ class App(QMainWindow):
         screen = app.primaryScreen()
         size = screen.size()
         rect = screen.availableGeometry()
-        self.width = rect.width()/2
+        self.width = rect.width()*0.85
         self.height = rect.height()
 
         self.setWindowTitle("PsgView")
@@ -808,18 +898,21 @@ class App(QMainWindow):
 
         self.setWindowTitle(self.title)
         self.setGeometry(self.left, self.top, self.width, self.height)
-        origin_labels,trace_num, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile = readfiles()    
-        height = trace_num*2 + 4
-        
-        self.reviewer = PlotCanvas(origin_labels,trace_num, gap, sampled, 
-            opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=8, height=height)
+        origin_labels,trace_num, channelname, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile = readfiles()    
+        height = trace_num*psg_scale + 3  
+        width = 14  
+        self.reviewer = PlotCanvas(origin_labels,trace_num, gap, sampled, channelname, 
+            opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=width, height=height)
         self.reviewer.connect()
-        self.reviewer.move(20,20)
+        self.reviewer.move(20,0)
 
         self.scroll = QScrollArea(self.widget)
         self.scroll.setWidget(self.reviewer)
         self.widget.layout().addWidget(self.scroll)
         self.checkboxes = []
+        self.scale_button_in = []
+        self.scale_button_out = []
+
 
         lbl = QLabel(self)
         lbl.setText("Customize Label")
@@ -832,7 +925,7 @@ class App(QMainWindow):
         self.label_2 = QLineEdit(self)
         label_2_button = QPushButton("Ok",self)
         label_2_button.setToolTip('Change the number of label to display')
-        start_x = 820
+        start_x = width * 100 + 20
         lbl.move(start_x, 30)
         self.label.move(start_x, 60)
         label_button.move(start_x,90)
@@ -845,15 +938,46 @@ class App(QMainWindow):
 
         for i in range(0,trace_num):
             box = QCheckBox('Track'+ str(i+1), self)
-            box.move(start_x,310+20*i)
+            box.move(start_x,310+25*i)
             box.ind = trace_num-1-i 
             box.stateChanged.connect(self.state_changed)
             box.setChecked(True)
             self.checkboxes.append(box)
+            button_1 =QPushButton("+",self)
+            button_1.setFixedWidth(20)
+            button_1.setFixedHeight(20)
+
+            button_2 =QPushButton("-",self)
+            button_2.setFixedWidth(20)
+            button_2.setFixedHeight(20)
+
+            button_1.move(start_x+80,315+25*i)
+            button_2.move(start_x+110,315+25*i)
+            button_1.ind = trace_num-1-i 
+            button_2.ind = trace_num-1-i 
+            button_1.clicked.connect(self.scale_unit_in)
+            button_2.clicked.connect(self.scale_unit_out)
+
+            self.scale_button_in.append(button_1)
+            self.scale_button_out.append(button_2)
+
 
     def add_label(self):
         text = self.label.text()
         self.reviewer.addlabel(text)
+    
+    def scale_unit_in(self):
+        target = self.sender()
+        index = target.ind 
+        self.reviewer.psg_ax.scale[index] += 2
+        self.reviewer.update_plot_data()
+
+    def scale_unit_out(self):
+        target = self.sender()
+        index = target.ind 
+        if self.reviewer.psg_ax.scale[index] - 2 > 0:
+            self.reviewer.psg_ax.scale[index] -= 2
+            self.reviewer.update_plot_data()
 
     def change_label(self):
         number = self.label_2.text()
@@ -892,6 +1016,8 @@ class App(QMainWindow):
         QtWidgets.QMessageBox.about(self, "Help", help_string)
     
     def keyPressEvent(self,e):
+        print(e)
+     #   Qt.Key_Right
         self.reviewer.on_key_press(e)
 
 
@@ -900,6 +1026,7 @@ class App(QMainWindow):
         index = target.ind 
         if state == Qt.Checked:
             self.reviewer.psg_ax.display[index] = True
+            self.reviewer.psg_ax.scale[index] += 2
         else:
             self.reviewer.psg_ax.display[index] = False
 
