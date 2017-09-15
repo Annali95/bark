@@ -1016,8 +1016,6 @@ class App(QMainWindow):
         QtWidgets.QMessageBox.about(self, "Help", help_string)
     
     def keyPressEvent(self,e):
-        print(e)
-     #   Qt.Key_Right
         self.reviewer.on_key_press(e)
 
 
