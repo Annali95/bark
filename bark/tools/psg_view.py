@@ -33,21 +33,21 @@ Shortcuts
 any letter or number    annotate segment
 ctrl+s                  saves the annotation data
 ctrl+h                  prints this message
-ctrl+o                  zoom out
-ctrl+i                  zoom in
-ctrl+j,right            next segment
-ctrl+i,left             previous segment
+down arrow              zoom out
+up arrow                zoom in
+right                   next segment
+left                    previous segment
 
 ctrl+z                  undo last operation
 ctrl+y                  redo
 ctrl+w                  close
 
 click on the right of the current label        next segment
-click on the left of the current label        previous segment
+click on the left of the current label         previous segment
 
 The top panel is a map of all label locations.
 Click on a label to travel to that location.
-
+Open file->shortcut to set label's shortcut
 On close, an operation file and the final event file will be written.
 Do not kill from terminal unless you want to prevent a save.
 
@@ -62,8 +62,8 @@ color_label = 'white'
 fontsize = 12
 default_gap = 3
 psg_scale = 2.5 #change the scale of the psg_viewer
+number_shortcut = {'1':'1', '2':'2','3':'3', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9', '0':'0'}
 
-number_shortcut = {'1':'I', '2':'S','3':'C', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9', '0':'0'}
 
 # kill all the shorcuts
 def kill_shortcuts(plt):
@@ -74,7 +74,6 @@ def kill_shortcuts(plt):
     plt.rcParams['keymap.grid'] = ''
     plt.rcParams['keymap.home'] = ''
     plt.rcParams['keymap.pan'] = ''
-    #plt.rcParams['keymap.quit'] = ''
     plt.rcParams['keymap.save'] = ''
     plt.rcParams['keymap.xscale'] = ''
     plt.rcParams['keymap.yscale'] = ''
@@ -741,7 +740,7 @@ class PlotCanvas(FigureCanvas):
     def deletelabel(self):
         if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
                 return
-        self.opstack.push(Update(self.label_index, '', str))
+        self.opstack.push(Update(self.label_index, 'name', ""))
         self.update_plot_data()       
 
 
@@ -842,6 +841,32 @@ class Input(QWidget):
         if ok:
             return gap 
 
+class Shortcut_map(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super(Shortcut_map, self).__init__(parent)
+        self.d = QtWidgets.QDialog()
+        b1 = QPushButton("ok",self.d)
+        b1.move(40,340)
+        start_x = 20
+        start_y = 20
+        self.testf = []
+        for i in range(0,6):
+            lbl = QLabel(str(i),self.d)
+            self.testf.append( QLineEdit(number_shortcut[str(i)],self.d))
+            lbl.move(start_x, start_y)
+            start_y += 20
+            self.testf[i].move(start_x, start_y)
+            start_y += 30
+        b1.clicked.connect(self.changesetting)
+        self.d.setWindowTitle("Dialog")
+        self.d.setWindowModality(Qt.ApplicationModal)
+        self.d.exec_()
+    def changesetting(self):
+        for i in range(0,6):
+            number_shortcut[str(i)] = self.testf[i].text()
+        self.d.close()
+
+
 class ScrollView (QtWidgets.QScrollArea):
     def __init__(self, parent = None):
         super(ScrollView, self).__init__(parent)
@@ -887,6 +912,8 @@ class App(QMainWindow):
         self.file_menu.addAction('&Help', self.help, QtCore.Qt.CTRL + QtCore.Qt.Key_H)
         self.file_menu.addAction('&Redo', self.reviewer.redo, QtCore.Qt.CTRL + QtCore.Qt.Key_Y)
         self.file_menu.addAction('&Undo', self.reviewer.undo, QtCore.Qt.CTRL + QtCore.Qt.Key_Z)
+        self.file_menu.addAction('&shortcut', self.key_map)
+
         # control        
         self.control_menu = QtWidgets.QMenu('&Control', self)
         self.menuBar().addSeparator()
@@ -1016,6 +1043,10 @@ class App(QMainWindow):
     
     def fileQuit(self):
         self.close()
+    
+    def key_map(self):
+        w = Shortcut_map()
+        w.show()
     
     def about(self):
         QtWidgets.QMessageBox.about(self, "About",
