@@ -61,7 +61,7 @@ color = 'yellow'
 color_label = 'white'
 fontsize = 12
 default_gap = 3
-psg_scale = 2.5 #change the scale of the psg_viewer
+psg_scale = 2 #change the scale of the psg_viewer
 number_shortcut = {'1':'1', '2':'2','3':'3', '4':'4', '5':'5', '6':'6', '7':'7', '8':'8', '9':'9', '0':'0'}
 
 
@@ -209,7 +209,8 @@ def readfiles(outfile=None, shortcutfile=None, use_ops=True):
     file = FileDialog()   
     files = file.openFileNamesDialog() 
     if not files:
-        sys.exit(app.exec_())
+        sys.exit(app.exec_())  
+    files.reverse()
     sampled = [bark.read_sampled(file) for file in files]   
     readonlylabelfile = file.openFileNameDialog()
     if not readonlylabelfile:
@@ -271,7 +272,6 @@ class Plot:
         self.gap = gap
         self.label = self.ax.text(0,0,'',fontsize=fontsize,color=color)
         self.label.set_visible(False)
-        # self.ax.figure.tight_layout()
         self.ax.get_xaxis().set_visible(x_visible)
         self.ax.get_yaxis().set_visible(y_visible)
 
@@ -291,6 +291,7 @@ class Plot:
         self.label.set_x((start+stop)/2)
         self.label.set_y(y)
         self.label.set_visible(True)
+
 
 class Psg_Plot(Plot):
 
@@ -428,50 +429,53 @@ class Label_Plot(Plot):
             self.update_origin_labels(current,data)
 
     def update_opstack_labels(self,current,opstack,y_pos = 4):
+        xmin, xmax = self.ax.get_xlim()
 
         'labels for current syl and two on either side'
-        for i in range(current -8, 11 + current):
+        for i in range(0,len(opstack.events)):
+            if(opstack.events[i]["start"]>=xmin):
+                break
+        start_i = i
+        while i >= 0 and i < len(opstack.events) and opstack.events[i]["stop"] < xmax:
+            label_i = i - start_i
+            text = self.labels[label_i]    
+            start_line = self.boundaries_start[label_i]
+            start_line.set_visible(True)
+            stop_line = self.boundaries_stop[label_i]
+            stop_line.set_visible(True)
 
-            label_i = i - current
-            if i >= 0 and i < len(opstack.events):
-                text = self.labels[label_i]    
-                start_line = self.boundaries_start[label_i]
-                start_line.set_visible(True)
-                stop_line = self.boundaries_stop[label_i]
-                stop_line.set_visible(True)
+            start = opstack.events[i]['start']
+            stop = opstack.events[i]['stop']
+            x = (start+stop) / 2                
+            ymin, ymax = self.ax.get_ylim()
+            y = (ymin+ymax)/y_pos
+            name = opstack.events[i]['name']
 
-                start = opstack.events[i]['start']
-                stop = opstack.events[i]['stop']
-                x = (start+stop) / 2                
-                ymin, ymax = self.ax.get_ylim()
-                y = (ymin+ymax)/y_pos
-                name = opstack.events[i]['name']
-
-                if isinstance(name, str):
-                    text.set_x(x)
-                    text.set_visible(True)
-                    text.set_text(name)
-                    text.set_y(y)
-
-                else:
-                    text.set_visible(False)
-
-                start_line.set_xdata((start, start))
-                stop_line.set_xdata((stop, stop))
-
-                if i == current:
-                    # The start line overlap with the stop line of previous label.
-                    # Fix this by putting start line and stop line on the top layer.
-                    # start_line.set_color('r')
-
-                    start_line_1 = self.boundaries_stop[label_i-1]
-                    start_line_1.set_color(color)
-                    stop_line.set_color(color)
-                    text.set_color(color)
-
+            if isinstance(name, str):
+                text.set_x(x)
+                text.set_visible(True)
+                text.set_text(name)
+                text.set_y(y)
 
             else:
-                self.labels[label_i].set_visible(False)
+                text.set_visible(False)
+
+            start_line.set_xdata((start, start))
+            stop_line.set_xdata((stop, stop))
+
+            if i == current:
+                # The start line overlap with the stop line of previous label.
+                # Fix this by putting start line and stop line on the top layer.
+                start_line_1 = self.boundaries_stop[label_i-1]
+                start_line_1.set_color(color)
+                stop_line.set_color(color)
+                text.set_color(color)
+            else:
+                self.boundaries_stop[label_i].set_color(color_label)
+                self.boundaries_stop[label_i].set_color(color_label)
+                text.set_color(color_label)
+
+            i += 1
 
     def update_origin_labels(self,current,origin_data):
         self.ax.cla()
@@ -510,13 +514,14 @@ class PlotCanvas(FigureCanvas):
                  dpi=100):
         
         fig = Figure(figsize =(width,height),dpi=dpi)
-        
         self.maxpoint = 20
-        self.axes_1 = fig.add_subplot(height+1,1,1)
-        self.axes_2 = fig.add_subplot(height+1,1,2)
-        pos = self.axes_2.get_position()       
-        pos_psg = [pos.x0, 1/(height+1) + 0.1 ,pos.width, pos.height * (height-2.2)] 
-        pos_map = [pos.x0, 0.05 ,pos.width, pos.height] 
+        pos_1 = [0.1, 0.9, 0.8, 0.06] 
+        pos_2 = [0.1, 0.82, 0.8, 0.06] 
+        pos_psg = [0.1, 0.2, 0.8, 0.6] 
+        pos_map = [0.1, 0.02, 0.8, 0.1] 
+
+        self.axes_1 = fig.add_axes(pos_1) 
+        self.axes_2 = fig.add_axes(pos_2) 
         self.axes_4 = fig.add_axes(pos_psg) 
         self.axes = fig.add_axes(pos_map) 
 
@@ -529,7 +534,6 @@ class PlotCanvas(FigureCanvas):
         for dataset in sampled:
             self.data.append(dataset.data.ravel())
             self.sr = dataset.sampling_rate
-        self.maxpoint = 15        
         self.N_points = int(round(self.sr*self.gap*self.maxpoint)) 
         self.label_attrs = out_attrs
         self.opstack = opstack
@@ -609,6 +613,9 @@ class PlotCanvas(FigureCanvas):
             if not self.origin_data.empty:           
                 self.label_ax.clear_plot()
             self.label_ax_2.clear_plot()
+            self.label_ax_2.update_x_axis(buf_start,buf_stop)       
+            self.label_ax_2.update_one_label(start,stop,name)      
+
         else:
             
             if not self.origin_data.empty:            
@@ -616,8 +623,6 @@ class PlotCanvas(FigureCanvas):
                 self.label_ax.update_labels(current = i,data = self.origin_data,origin_data=True) 
            
             self.label_ax_2.update_x_axis(buf_start,buf_stop)       
-            self.label_ax_2.update_one_label(start,stop,name)      
-
             self.label_ax_2.update_labels(current = i,data = self.opstack,origin_data=False)
 
         self.update_minimap()
@@ -741,16 +746,16 @@ class PlotCanvas(FigureCanvas):
         if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
                 return
         self.opstack.push(Update(self.label_index, 'name', ""))
-        self.update_plot_data()       
+        self.dec_i()
 
 
     def zoom_in_x(self):
-        self.N_points += int(self.sr * self.gap)*20
+        self.N_points += self.N_points
         self.update_plot_data()
     
     def zoom_out_x(self):
-        if self.N_points > int(self.sr * self.gap)*20:
-            self.N_points -= int(self.sr * self.gap)*20
+        if self.N_points >= int(self.sr * self.gap)*2:
+            self.N_points -= int(self.N_points/2);
         self.update_plot_data()
 
     def zoom_in_y(self):
