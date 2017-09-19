@@ -706,11 +706,22 @@ class PlotCanvas(FigureCanvas):
         if self.label_index < len(self.opstack.events) - 1:
             self.label_index += 1
         self.update_plot_data()
+    def inc_page(self):
+        'Go to next syllable.'
+        if self.label_index +int(self.N_points/int(self.sr * self.gap)) < len(self.opstack.events):
+            self.label_index += int(self.N_points/int(self.sr * self.gap))
+        self.update_plot_data()
+
 
     def dec_i(self):
         'Go to previous syllable.'
         if self.label_index > 0:
             self.label_index -= 1
+        self.update_plot_data()
+    def dec_page(self):
+        'Go to next syllable.'
+        if self.label_index - int(self.N_points/int(self.sr * self.gap)) > 0:
+            self.label_index -= int(self.N_points/int(self.sr * self.gap))
         self.update_plot_data()
 
     def on_key_press(self, event):
@@ -750,7 +761,8 @@ class PlotCanvas(FigureCanvas):
 
 
     def zoom_in_x(self):
-        self.N_points += self.N_points
+        if self.N_points < int(self.sr * self.gap)*120:
+            self.N_points += self.N_points
         self.update_plot_data()
     
     def zoom_out_x(self):
@@ -930,6 +942,8 @@ class App(QMainWindow):
         self.control_menu.addAction('&zoom out y',self.reviewer.zoom_out_y, QtCore.Qt.CTRL + QtCore.Qt.Key_E)
         self.control_menu.addAction('&next',self.reviewer.inc_i, QtCore.Qt.CTRL + QtCore.Qt.Key_J)
         self.control_menu.addAction('&previous',self.reviewer.dec_i,QtCore.Qt.CTRL + QtCore.Qt.Key_F)
+        self.control_menu.addAction('&nextpage',self.reviewer.inc_page,QtCore.Qt.Key_PageUp)
+        self.control_menu.addAction('&previouspage',self.reviewer.dec_page,QtCore.Qt.Key_PageDown)
         self.control_menu.addAction('&delete',self.reviewer.deletelabel,QtCore.Qt.Key_Backspace)
 
 
