@@ -56,9 +56,9 @@ To create custom label, input the label name in the right toolbar.
 
 ''' 
 
-
 color = 'yellow'
 color_label = 'white'
+color_map = plt.get_cmap('hsv')
 fontsize = 12
 default_gap = 3
 psg_scale = 2 #change the scale of the psg_viewer
@@ -96,6 +96,18 @@ def labels_to_scatter_coords(labels):
             v = 37
         values.append(v)
     return times, values
+
+def label_to_scatter(name):
+    if not isinstance(name, str) or name == '':
+        v = 0
+    elif name.isdigit():
+        v = int(name)
+    elif name[0].isalpha():
+        # alphabet in range 11-36
+        v = 133 - ord(name[0].lower())
+    else:
+        v = 37
+    return v
 
 
 def nearest_label(labels, xdata):
@@ -288,6 +300,7 @@ class Plot:
         ymin, ymax = self.ax.get_ylim()
         y = (ymin+ymax)/4
         self.label.set_text(name)
+        self.label.set_color(color_map(label_to_scatter(name)*7))
         self.label.set_x((start+stop)/2)
         self.label.set_y(y)
         self.label.set_visible(True)
@@ -456,6 +469,7 @@ class Label_Plot(Plot):
                 text.set_visible(True)
                 text.set_text(name)
                 text.set_y(y)
+                text.set_color(color_map(label_to_scatter(name)*7))
 
             else:
                 text.set_visible(False)
@@ -469,11 +483,9 @@ class Label_Plot(Plot):
                 start_line_1 = self.boundaries_stop[label_i-1]
                 start_line_1.set_color(color)
                 stop_line.set_color(color)
-                text.set_color(color)
             else:
                 self.boundaries_stop[label_i].set_color(color_label)
                 self.boundaries_stop[label_i].set_color(color_label)
-                text.set_color(color_label)
 
             i += 1
 
@@ -490,7 +502,7 @@ class Label_Plot(Plot):
             ymin, ymax = self.ax.get_ylim()
             pos_y = (ymin+ymax)/3
             pos_x = origin_data["start"][i] + (origin_data["stop"][i]-origin_data["start"][i])/2
-            self.ax.text(pos_x, pos_y, name, fontsize=12, color = 'pink')
+            self.ax.text(pos_x, pos_y, name, fontsize=12, color = color_map(label_to_scatter(name)*7))
             i += 1
 
 
@@ -634,8 +646,8 @@ class PlotCanvas(FigureCanvas):
         if i == 0:
             self.map_ax.set_title('ctrl+h for help, prints to terminal')
         else:
-            self.map_ax.set_title('{}/ {} {}'.format(i + 1, len(
-                self.opstack.events), last_command))
+            self.map_ax.set_title('Epoch {}/ {}'.format(i + 1, len(
+                self.opstack.events)))
 
         self.draw()
 
@@ -730,9 +742,9 @@ class PlotCanvas(FigureCanvas):
             self.inc_i()
         elif event.key() == Qt.Key_Left:
             self.dec_i()
-        if event.key()  == Qt.Key_Up:
+        if event.key()  == Qt.Key_Down:
             self.zoom_in_x()
-        elif event.key() == Qt.Key_Down:
+        elif event.key() == Qt.Key_Up:
             self.zoom_out_x()
         elif event.key() <= Qt.Key_Z and event.key() >= Qt.Key_A:
             if self.N_points > int(round(self.sr*self.gap*self.maxpoint)):
@@ -863,11 +875,11 @@ class Shortcut_map(QtWidgets.QDialog):
         super(Shortcut_map, self).__init__(parent)
         self.d = QtWidgets.QDialog()
         b1 = QPushButton("ok",self.d)
-        b1.move(40,340)
+        b1.move(40,540)
         start_x = 20
         start_y = 20
         self.testf = []
-        for i in range(0,6):
+        for i in range(0,10):
             lbl = QLabel(str(i),self.d)
             self.testf.append( QLineEdit(number_shortcut[str(i)],self.d))
             lbl.move(start_x, start_y)
@@ -879,7 +891,7 @@ class Shortcut_map(QtWidgets.QDialog):
         self.d.setWindowModality(Qt.ApplicationModal)
         self.d.exec_()
     def changesetting(self):
-        for i in range(0,6):
+        for i in range(0,10):
             number_shortcut[str(i)] = self.testf[i].text()
         self.d.close()
 
@@ -901,13 +913,9 @@ class App(QMainWindow):
         self.top = 20
         self.title = 'PsgView'
         app = QtWidgets.QApplication(sys.argv)
-        screen = app.primaryScreen()
-        size = screen.size()
-        rect = screen.availableGeometry()
-        self.width = rect.width()*0.85
+        rect = app.primaryScreen().availableGeometry()
+        self.width = rect.width()
         self.height = rect.height()
-
-        self.setWindowTitle("PsgView")
         self.widget = QWidget()
         self.setCentralWidget(self.widget)
         self.widget.setLayout(QVBoxLayout())
@@ -915,7 +923,7 @@ class App(QMainWindow):
         self.widget.layout().setSpacing(0)
         self.initUI()
         self.initToolbar()
-
+        self.initToolbox()
         self.show()
 
     def initToolbar(self):
@@ -931,21 +939,21 @@ class App(QMainWindow):
         self.file_menu.addAction('&Undo', self.reviewer.undo, QtCore.Qt.CTRL + QtCore.Qt.Key_Z)
         self.file_menu.addAction('&shortcut', self.key_map)
 
+
         # control        
         self.control_menu = QtWidgets.QMenu('&Control', self)
         self.menuBar().addSeparator()
         self.menuBar().addMenu(self.control_menu)
         
-        self.control_menu.addAction('&zoom in x', self.reviewer.zoom_in_x, QtCore.Qt.CTRL + QtCore.Qt.Key_A)
-        self.control_menu.addAction('&zoom out x',self.reviewer.zoom_out_x, QtCore.Qt.CTRL + QtCore.Qt.Key_D)
+        self.control_menu.addAction('&zoom in x', self.reviewer.zoom_in_x, QtCore.Qt.CTRL + QtCore.Qt.Key_I)
+        self.control_menu.addAction('&zoom out x',self.reviewer.zoom_out_x, QtCore.Qt.CTRL + QtCore.Qt.Key_O)
         self.control_menu.addAction('&zoom in y', self.reviewer.zoom_in_y, QtCore.Qt.CTRL + QtCore.Qt.Key_W)
         self.control_menu.addAction('&zoom out y',self.reviewer.zoom_out_y, QtCore.Qt.CTRL + QtCore.Qt.Key_E)
         self.control_menu.addAction('&next',self.reviewer.inc_i, QtCore.Qt.CTRL + QtCore.Qt.Key_J)
         self.control_menu.addAction('&previous',self.reviewer.dec_i,QtCore.Qt.CTRL + QtCore.Qt.Key_F)
-        self.control_menu.addAction('&nextpage',self.reviewer.inc_page,QtCore.Qt.Key_PageUp)
-        self.control_menu.addAction('&previouspage',self.reviewer.dec_page,QtCore.Qt.Key_PageDown)
+        self.control_menu.addAction('&nextpage',self.reviewer.inc_page,QtCore.Qt.Key_PageDown)
+        self.control_menu.addAction('&previouspage',self.reviewer.dec_page,QtCore.Qt.Key_PageUp)
         self.control_menu.addAction('&delete',self.reviewer.deletelabel,QtCore.Qt.Key_Backspace)
-
 
 
     def initUI(self):
@@ -954,32 +962,32 @@ class App(QMainWindow):
         self.setGeometry(self.left, self.top, self.width, self.height)
         origin_labels,trace_num, channelname, gap, sampled, opstack, shortcuts, outfile, attrs, opsfile = readfiles()    
         height = trace_num*psg_scale + 3  
-        width = 14  
+        self.width = self.width/100 
+        self.trace_num = trace_num
         self.reviewer = PlotCanvas(origin_labels,trace_num, gap, sampled, channelname, 
-            opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=width, height=height)
+            opstack, shortcuts, outfile, attrs, opsfile, parent = self, width=self.width, height=height)
         self.reviewer.connect()
         self.reviewer.move(20,0)
-
         self.scroll = ScrollView(self.widget)
         self.scroll.setWidget(self.reviewer)
         self.widget.layout().addWidget(self.scroll)
+
         self.checkboxes = []
         self.scale_button_in = []
         self.scale_button_out = []
-
-
+    def initToolbox(self):
+        trace_num = self.trace_num
         lbl = QLabel(self)
         lbl.setText("Customize Label")
         self.label = QLineEdit(self)
         label_button = QPushButton("Add Label",self)
-        label_button.setToolTip('This is an example button')
 
         lbl_2 = QLabel(self)
-        lbl_2.setText("Number of Label to display")
+        lbl_2.setText("Number of Labels to display")
         self.label_2 = QLineEdit(self)
         label_2_button = QPushButton("Ok",self)
-        label_2_button.setToolTip('Change the number of label to display')
-        start_x = width * 100 + 20
+        label_2_button.setToolTip('Change the number of labels to display')
+        start_x = (self.width-1) * 100 -50
         lbl.move(start_x, 30)
         self.label.move(start_x, 60)
         label_button.move(start_x,90)
@@ -1059,7 +1067,7 @@ class App(QMainWindow):
             self.reviewer.update_plot_data()
         else:
             info = "Please select a number, `{0}` isn't valid!"
-    
+
     def fileQuit(self):
         self.close()
     
