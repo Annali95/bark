@@ -1,5 +1,8 @@
 # Bark
-Bark is a standard for electrophysiology data. 
+Bark is:
+1. a standard for time-series data, and a python implementation for reading and writing bark formatted data.
+2. A python module for signal processing on larger-than-memory data sets.
+3. A set of command-line tools for building data processing pipelines.
 
 [![Build Status](https://travis-ci.org/kylerbrown/bark.svg?branch=master)](https://travis-ci.org/kylerbrown/bark)
 
@@ -13,13 +16,13 @@ Version: 0.2
 By emphasizing filesystem directories, plain text files and a common binary array format, Bark makes it easy to use both
 large external projects and simple command-line utilities.
 
-Bark's [small specification](specification.md) and Python implementation are easy to use in custom tools.
+Bark's [small specification](../specification.md) and Python implementation are easy to use in custom tools.
 
 These tools can be chained together using GNU Make to build data pipelines.
 
 ## Why use Bark?
 
-Bark takes the architecture of ARF and replaces HDF5 with common data storage formats, the advantages of this approach are:
+Inspired by ARF, Bark uses a hierarchy of common data storage formats. The advantages of this approach are:
 
 - Use standard Unix tools to explore your data (cd, ls, grep, find, mv)
 - Build robust data processing pipelines with shell scripting or
@@ -58,14 +61,14 @@ The python interface requires Python 3.5+. Installation with [Conda](http://cond
 
 If any error happens, please make sure your matplotlib version is 2.0.2 and the pyqt version is 5.6.0.
 
-    git clone https://github.com/kylerbrown/bark
-    cd bark
-    
     git clone https://github.com/kylerbrown/resin
     cd resin
     pip install .
     cd ..
-  
+
+    git clone https://github.com/margoliashlab/bark
+    cd bark
+    
     pip install -r requirements.txt
     pip install .
 
@@ -108,6 +111,7 @@ There are many external tools for processing CSV files, including [pandas](http:
 Note for  MacOS users: run this command in the terminal:  
 `$ ln -s /Applications/neuroscope.app/Contents/MacOS/neuroscope /usr/local/bin/neuroscope`
 - `bark-label-view` -- Annotate or review events in relation to a sampled dataset, such as birdsong syllable labels on a microphone recording.
+- `bark-psg-view` -- Annotate or review  on mutiply channels of .dat files. 
 
 ### Conversion
 
@@ -115,6 +119,7 @@ Note for  MacOS users: run this command in the terminal:
 - `bark-convert-rhd` -- converts [Intan](http://intantech.com/) .rhd files to datasets in a Bark entry
 - `bark-convert-openephys` -- converts a folder of [Open-Ephys](http://www.open-ephys.org/) .kwd files to datasets in a Bark entry
 - `bark-convert-arf` -- converts an ARF file to entries in a Bark Root
+- `bark-convert-spyking` -- converts [Spyking Circus](https://spyking-circus.readthedocs.io/en/latest/) spike-sorted event data to a Bark event dataset
 - `csv-from-waveclus` -- converts a [wave_clus](https://github.com/csn-le/wave_clus) spike time file to a CSV
 - `csv-from-textgrid` -- converts a [praat](http://www.fon.hum.uva.nl/praat/) TextGrid file to a CSV
 - `csv-from-lbl` -- converts an [aplot](https://github.com/melizalab/aplot) [lbl](https://github.com/kylerbrown/lbl) file to a CSV
