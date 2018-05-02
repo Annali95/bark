@@ -49,6 +49,6 @@ setup(name='bark',
               'bark-for-each=bark.tools.barkforeach:_main',
               'bark-rasters=bark.tools.genrasters:_main',
               'bark-psg-view=bark.tools.psg_view:_main',
-              'bark-bplot=bark.tools.B_PLot:_main',
+              'bark-bplot=bark.tools.B_PLot:_run',
           ]
       })
